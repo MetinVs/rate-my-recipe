@@ -2,155 +2,236 @@
 
 ## Project Overview
 
-This project analyzes user ratings from the Food.com dataset to develop a more reliable method for ranking recipes.
+Rate My Recipe is a Python-based data analysis project that
+investigates how recipes can be ranked using user ratings.
 
-A simple ranking based only on average ratings can be misleading. For example, a recipe with a 5.0 average rating based on only one review may appear above a recipe with a 4.9 average rating supported by hundreds of reviews.
+Ranking recipes solely by their average rating can be misleading,
+especially when the number of ratings varies significantly.
 
-The objective of this project is to create a ranking method that considers both:
+This project introduces a weighted ranking strategy that combines
+rating quality with the amount of available user feedback.
 
-- the average rating of a recipe;
-- the number of ratings received.
+The project includes a Jupyter Notebook for statistical analysis
+and an interactive Streamlit dashboard for exploring recipe rankings.
 
 ## Dataset
 
-The project uses the Food.com Recipes and User Interactions dataset.
+The project uses the Food.com Recipes and User Interactions dataset
+available on Kaggle.
 
-Two main files are used:
+[Download the dataset](https://www.kaggle.com/datasets/shuyangli94/food-com-recipes-and-user-interactions)
 
-- `RAW_recipes.csv` — recipe information such as preparation time, ingredients and number of steps;
-- `RAW_interactions.csv` — user interactions containing recipe ratings and reviews.
+The dataset contains:
 
-The raw data files are stored locally inside:
+- 231,637 recipes
+- 1,132,367 user interactions
+- 1,071,520 valid ratings
+- 226,590 recipes with valid ratings
 
-```text
-data/raw/
-```
+Download the following files and place them in `data/raw/`:
 
-The raw data is not included in the GitHub repository because of its size.
+- RAW_recipes.csv
+- RAW_interactions.csv
+
+Raw datasets are excluded from the GitHub repository.
 
 ## Project Structure
 
 ```text
-Coding for Data Science and Data Management/
-│
-├── Python Project.ipynb
-├── README.md
-├── requirements.txt
-├── .gitignore
-│
+rate-my-recipe/
 ├── data/
 │   └── raw/
-│
+│       ├── RAW_recipes.csv
+│       └── RAW_interactions.csv
 ├── src/
+│   ├── __init__.py
 │   ├── data_processing.py
-│   └── ranking.py
-│
-└── outputs/
+│   ├── ranking.py
+│   ├── analysis.py
+│   └── plots.py
+├── Python Project.ipynb
+├── app.py
+├── requirements.txt
+├── README.md
+└── .gitignore
 ```
 
-## Data Preparation
+## Methodology
 
-User interactions with a rating equal to `0` are treated as missing star ratings and are excluded from rating calculations.
+### 1. Data Processing
 
-The interaction data is then aggregated to recipe level to calculate:
+- Load recipe and interaction datasets.
+- Check for missing files and duplicate records.
+- Convert zero ratings to missing values.
+- Aggregate valid ratings by recipe ID.
+- Merge rating statistics with recipe characteristics.
 
-- `avg_rating` — average valid rating;
-- `n_ratings` — number of valid ratings received by each recipe.
+### 2. Naive Ranking
 
-These statistics are merged with the recipe dataset.
+Recipes are ranked according to their average rating.
+This approach does not account for the number of ratings.
 
-## Naive Ranking
+### 3. Weighted Ranking
 
-The first ranking method orders recipes only by their average rating.
+The weighted rating is calculated as:
 
-This approach reveals an important limitation: many recipes with a perfect 5.0 average rating have received only one or a few ratings.
+$$
+WR = \frac{vR + mC}{v+m}
+$$
 
-Therefore, the raw average alone does not provide information about the reliability of the score.
+Where:
 
-## Weighted Rating
+- R: average rating of the recipe
+- v: number of valid ratings
+- C: global average rating
+- m: weighting parameter
 
-To account for the number of ratings, the project uses a weighted rating:
+Recipes with fewer ratings are pulled toward the global
+average, while recipes with more ratings rely more heavily
+on their own average.
 
-\[
-WR =
-\frac{v}{v+m}R +
-\frac{m}{v+m}C
-\]
+### 4. Sensitivity Analysis
 
-where:
+Three weighting parameters were evaluated using the
+distribution of valid rating counts:
 
-- `R` = average rating of the recipe;
-- `v` = number of valid ratings received by the recipe;
-- `C` = global average rating across all valid user ratings;
-- `m` = confidence threshold.
+| Percentile | Weighting parameter |
+|---|---:|
+| 90th | 9 |
+| 95th | 14 |
+| 99th | 45 |
 
-Recipes with only a few ratings are pulled toward the global average, while recipes with many ratings depend more strongly on their own average rating.
+The 95th percentile (m = 14) was selected as a balanced
+weighting parameter for the final ranking.
 
-## Confidence Threshold
+### 5. Ingredient Category Analysis
 
-The 90th, 95th and 99th percentiles of the rating-count distribution were tested as alternative confidence thresholds.
+Recipes are divided into three categories:
 
-These correspond approximately to:
+| Category | Number of ingredients |
+|---|---:|
+| Simple | 1–5 |
+| Moderate | 6–10 |
+| Complex | 11+ |
 
-- 90th percentile: 9 ratings;
-- 95th percentile: 14 ratings;
-- 99th percentile: 45 ratings.
+Category-level statistics and category-specific rankings
+are calculated using Pandas.
 
-The 95th percentile (`m = 14`) was selected as the final threshold because it provides a balance between rating quality and rating volume without giving excessive importance only to the most-reviewed recipes.
+## Performance Optimization and Validation
 
-## Main Findings
+The original row-wise Pandas implementation was replaced
+with a vectorized NumPy implementation.
 
-The dataset contains more than 230,000 recipes and more than one million user interactions.
+A benchmark performed on 226,590 recipes produced the
+following results:
 
-The analysis shows that:
+| Implementation | Execution time |
+|---|---:|
+| Pandas Apply | 0.7797 seconds |
+| NumPy Vectorization | 0.0192 seconds |
 
-- most recipes receive relatively few ratings;
-- raw average ratings are therefore sensitive to small sample sizes;
-- the weighted ranking substantially reduces the influence of recipes supported by only one or a few ratings;
-- highly ranked recipes have similar median preparation times to the overall recipe population;
-- the top-ranked recipes tend to use slightly fewer ingredients.
+The vectorized implementation was approximately 40.5 times
+faster in this benchmark.
 
-## Requirements
+Numerical equivalence was verified using `np.allclose()`.
+Additional controlled test cases were used to validate
+the weighted rating formula.
 
-The project uses:
+All controlled validation tests passed.
 
-- Python
-- NumPy
-- pandas
-- Matplotlib
-- Seaborn
+Execution times may vary depending on hardware and
+environment.
 
-Install the required packages with:
+## Key Findings
+
+- The median number of valid ratings per recipe is only 2.
+- The global average rating is approximately 4.66.
+- Weighted ranking reduces the influence of extreme
+  ratings based on small samples.
+- The top 100 ranked recipes have the same median
+  preparation time as the overall dataset: 40 minutes.
+- Top-ranked recipes have fewer ingredients at the median.
+- All three ingredient categories have a median weighted
+  score of 4.6841, rounded to four decimal places.
+
+These findings are descriptive and do not establish
+causal relationships or predictive performance.
+
+## Interactive Dashboard
+
+The Streamlit dashboard allows users to:
+
+- Switch between average and weighted ranking.
+- Filter recipes by ingredient category.
+- Adjust the weighting parameter.
+- Select the number of displayed recipes.
+- Explore rating distributions and relationships.
+
+The dashboard reuses the same Python modules as the
+Jupyter Notebook and uses caching to avoid repeatedly
+loading the raw datasets.
+
+## Installation
+
+The project was developed using Python 3.12.7.
+
+Clone the repository:
 
 ```bash
-pip install -r requirements.txt
+git clone https://github.com/MetinVs/rate-my-recipe.git
+cd rate-my-recipe
 ```
+
+Create a virtual environment:
+
+```bash
+python3.12 -m venv .venv
+source .venv/bin/activate
+```
+
+Install the required dependencies:
+
+```bash
+python -m pip install -r requirements.txt
+```
+
+Download the datasets and place them in `data/raw/`
+before running the project.
 
 ## Running the Project
 
-1. Download the Food.com dataset.
-2. Place `RAW_recipes.csv` and `RAW_interactions.csv` inside:
-
-```text
-data/raw/
-```
-
-3. Install the required Python packages:
+### Jupyter Notebook
 
 ```bash
-pip install -r requirements.txt
+python -m jupyterlab
 ```
 
-4. Open and run:
+Open `Python Project.ipynb` and run all cells.
 
-```text
-Python Project.ipynb
+### Streamlit Dashboard
+
+```bash
+python -m streamlit run app.py
 ```
 
-The notebook imports the data-processing and ranking functions from the `src` directory.
+Open the local Streamlit address in your browser.
+
+## Limitations
+
+- The weighting parameter is a modeling choice rather
+  than an empirically optimized parameter.
+- Rating volume does not necessarily guarantee recipe quality.
+- User-specific preferences are not considered.
+- Ingredient count is only an approximate indicator
+  of recipe complexity.
+- The ranking has not been evaluated against future ratings.
 
 ## Author
 
-Metin Mirza Vatansever  
-MSc Data Science for Economics and Health  
+Metin Mirza Vatansever
+
+MSc Data Science for Economics and Health
 University of Milan
+
+Coding for Data Science and Data Management
+Academic Year 2026/2027

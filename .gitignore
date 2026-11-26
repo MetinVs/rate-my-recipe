@@ -14,3 +14,6 @@ data/raw/
 # Generated outputs
 outputs/
 9-matplotlib.md
+
+# Virtual environment
+.venv/

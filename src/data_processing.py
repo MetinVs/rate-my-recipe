@@ -5,14 +5,23 @@ import pandas as pd
 
 
 def load_data(raw_data_dir: Path):
-    """
-    Load the Food.com recipe and interaction datasets.
-    """
-    recipes = pd.read_csv(raw_data_dir / "RAW_recipes.csv")
-    interactions = pd.read_csv(raw_data_dir / "RAW_interactions.csv")
+    """Load recipe and interaction datasets from CSV files."""
+
+    recipes_path = raw_data_dir / "RAW_recipes.csv"
+    interactions_path = raw_data_dir / "RAW_interactions.csv"
+
+    for path in [recipes_path, interactions_path]:
+        if not path.is_file():
+            raise FileNotFoundError(
+                f"Dataset not found: {path}. "
+                "Download the Food.com dataset from Kaggle "
+                "and place the CSV files in data/raw/."
+            )
+
+    recipes = pd.read_csv(recipes_path)
+    interactions = pd.read_csv(interactions_path)
 
     return recipes, interactions
-
 
 def clean_interactions(interactions: pd.DataFrame) -> pd.DataFrame:
     """

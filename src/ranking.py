@@ -20,29 +20,26 @@ def weighted_rating(
 
 
 def add_weighted_score(
-    recipe_stats: pd.DataFrame,
-    global_mean: float,
-    min_ratings: float,
-    column_name: str = "weighted_score"
-) -> pd.DataFrame:
-    """
-    Add a weighted rating score to the recipe dataset.
-    """
-    result = recipe_stats.copy()
+    recipe_stats,
+    global_mean,
+    min_ratings,
+    column_name="weighted_score"
+):
+    """Calculate weighted recipe scores using vectorization."""
 
-    result[column_name] = np.nan
+    result = recipe_stats.copy()
 
     mask = result["n_ratings"] > 0
 
-    result.loc[mask, column_name] = (
-        result.loc[mask]
-        .apply(
-            weighted_rating,
-            axis=1,
-            global_mean=global_mean,
-            min_ratings=min_ratings
-        )
-    )
+    R = result.loc[mask, "avg_rating"].to_numpy()
+    v = result.loc[mask, "n_ratings"].to_numpy()
+
+    scores = (
+        v * R + min_ratings * global_mean
+    ) / (v + min_ratings)
+
+    result[column_name] = np.nan
+    result.loc[mask, column_name] = scores
 
     return result
 
